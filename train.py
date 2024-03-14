@@ -30,23 +30,28 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
 
+#--- LoRA
+use_lora = False
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
 out_dir = 'out'
 eval_interval = 2000
-log_interval = 1
+log_interval = 1   # log_interval=10 in train_shakespeare_char.py
 eval_iters = 200
 eval_only = False # if True, script exits right after the first eval
 always_save_checkpoint = True # if True, always save a checkpoint after each eval
-init_from = 'scratch' # 'scratch' or 'resume' or 'gpt2*'
+# init_from = 'scratch' # 'scratch' or 'resume' or 'gpt2*'
+# 直接使用现有的进行微调
+init_from = 'gpt2' # 'scratch' or 'resume' or 'gpt2*'
+
 
 
 # wandb logging
-wandb_log = False # disabled by default
-wandb_project = 'Tianhaoran_nanoGPT2'
-wandb_run_name = 'gpt2' # 'run' + str(time.time())
-
+wandb_log = True # disabled by default
+wandb_project = 'thrGPT'
+wandb_run_name = 'gpt2_lora' # 'run' + str(time.time())
+wandb_api_key = '82ad31ab803ed9208f4c6fdeb76aed77c26c07c1'
 
 # data
 dataset = 'openwebtext'
@@ -57,6 +62,7 @@ block_size = 1024
 n_layer = 12
 n_head = 12
 n_embd = 768
+lora_d = 768
 dropout = 0.0 # for pretraining 0 is good, for finetuning try 0.1+
 bias = False # do we use bias inside LayerNorm and Linear layers?
 # adamw optimizer
@@ -81,7 +87,8 @@ backend = 'nccl' # 'nccl', 'gloo', etc.
 # device = 'cuda' # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1' etc., or try 'mps' on macbooks
 device = 'cuda' if torch.cuda.is_available() else 'cpu' # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1' etc., or try 'mps' on macbooks
 dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
-compile = True # use PyTorch 2.0 to compile the model to be faster
+# compile = True # use PyTorch 2.0 to compile the model to be faster
+compile = False # win and mac doesn't compile
 # -----------------------------------------------------------------------------
 config_keys = [k for k,v in globals().items() if not k.startswith('_') and isinstance(v, (int, float, bool, str))]
 exec(open('configurator.py').read()) # overrides from command line or config file
@@ -205,6 +212,23 @@ elif init_from.startswith('gpt2'):
     # read off the created config params, so we can store them into checkpoint correctly
     for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
         model_args[k] = getattr(model.config, k)
+
+
+
+# define LoRA
+
+if use_lora:
+    import loralib as lora
+    print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+    print("We-are-using LoRA to finetune our model")
+    print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+    in_features = out_features = lora_d
+    layer = lora.Linear(in_features, out_features, r=16)
+    lora.mark_only_lora_as_trainable(model)
+
+
+
+
 # crop down the model block size if desired, using model surgery
 if block_size < model.config.block_size:
     model.crop_block_size(block_size)
@@ -263,6 +287,7 @@ def get_lr(it):
 # logging
 if wandb_log and master_process:
     import wandb
+    wandb.login(key=wandb_api_key)
     wandb.init(project=wandb_project, name=wandb_run_name, config=config)
 
 # training loop
@@ -302,7 +327,11 @@ while True:
                     'config': config,
                 }
                 print(f"saving checkpoint to {out_dir}")
-                torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+                # 保存lora模块的参数
+                if use_lora:
+                    torch.save(lora.lora_state_dict(model), os.path.join(out_dir, 'ckpt_with_lora_2.pt'))
+                # 保存模型的其他参数
+                torch.save(checkpoint, os.path.join(out_dir, 'ckpt_2.pt'))
     if iter_num == 0 and eval_only:
         break
 
@@ -343,6 +372,7 @@ while True:
         if local_iter_num >= 5: # let the training loop settle a bit
             mfu = raw_model.estimate_mfu(batch_size * gradient_accumulation_steps, dt)
             running_mfu = mfu if running_mfu == -1.0 else 0.9*running_mfu + 0.1*mfu
+        # 最终打印的内容
         print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%")
     iter_num += 1
     local_iter_num += 1

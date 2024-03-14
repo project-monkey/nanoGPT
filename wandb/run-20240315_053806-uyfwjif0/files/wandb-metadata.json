@@ -1,0 +1,55 @@
+{
+    "os": "Windows-10-10.0.22621-SP0",
+    "python": "3.9.18",
+    "heartbeatAt": "2024-03-14T21:38:08.740240",
+    "startedAt": "2024-03-14T21:38:06.497559",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "config/train_shakespeare_char_lora.py"
+    ],
+    "state": "running",
+    "program": "C:\\Users\\ALIENWARE\\Desktop\\transformer\\nanoGPT\\train.py",
+    "codePathLocal": "train.py",
+    "codePath": "train.py",
+    "git": {
+        "remote": "git@github.com:project-monkey/nanoGPT.git",
+        "commit": "683ac7a1b8bfc7b32314ccc9f5319c9446e07c22"
+    },
+    "email": "2649706356@qq.com",
+    "root": "C:/Users/ALIENWARE/Desktop/transformer/nanoGPT",
+    "host": "DESKTOP-CT8AN10",
+    "username": "ALIENWARE",
+    "executable": "C:\\Users\\ALIENWARE\\.conda\\envs\\nanoGPT\\python.exe",
+    "cpu_count": 8,
+    "cpu_count_logical": 16,
+    "cpu_freq": {
+        "current": 2304.0,
+        "min": 0.0,
+        "max": 2304.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2304.0,
+            "min": 0.0,
+            "max": 2304.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 227.97643661499023,
+            "used": 211.3469352722168
+        }
+    },
+    "gpu": "NVIDIA GeForce RTX 3070 Laptop GPU",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 3070 Laptop GPU",
+            "memory_total": 8589934592
+        }
+    ],
+    "memory": {
+        "total": 31.73318862915039
+    }
+}
